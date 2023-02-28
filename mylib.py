@@ -98,8 +98,13 @@ def myfunc():
                 except UnexpectedAlertPresentException:
                     driver.switch_to.alert.accept()
                 else:
-                    crs_name = add_it.find_element(By.XPATH, '../..//a[@class="myLink"]').text
-                    status = add_it.find_element(By.XPATH, '../..').get_attribute("class")
+                    while True:
+                        try:
+                            crs_name = add_it.find_element(By.XPATH, '../..//a[@class="myLink"]').text
+                            status = add_it.find_element(By.XPATH, '../..').get_attribute("class")
+                            break
+                        except StaleElementReferenceException:
+                            pass
                     if "alert-success" in status or "alert-warning" in status:
                         try:
                             print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Adding Crsno:", Crsno)
