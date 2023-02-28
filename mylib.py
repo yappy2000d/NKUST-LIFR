@@ -3,10 +3,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, StaleElementReferenceException
+from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException, NoSuchElementException
+from selenium.common.exceptions import WebDriverException, StaleElementReferenceException
 from time import sleep
 from datetime import datetime
 import argparse
+import getpass
 
 def myfunc():
     parser = argparse.ArgumentParser()
@@ -18,35 +20,41 @@ def myfunc():
     parser.set_defaults(headless=True)
     args = parser.parse_args()
 
-    UserAccount = input("Account: ")
-    Password = input("Password: ")
-    Crsno_List = input("Courses: ").split()
-
     delay = args.delay
-    print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Program Started!")
 
     options = webdriver.EdgeOptions()
-    options.add_argument("-enable-webgl --no-sandbox --disable-dev-shm-usage")
+    options.add_argument('--disable-web-security --disable-dev-shm-usage')
 
     if args.headless == True:
-        user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.50 Safari/537.36'
-        options.add_argument(f'--headless --disable-gpu --disable-web-security user-agent={user_agent}')
+        options.add_argument('--headless --disable-gpu')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
-
-    options.add_experimental_option("detach", True)
 
     driver = webdriver.Edge(options=options)
     driver.get('https://aais1.nkust.edu.tw/selcrs_dp')
 
     # 登入頁面
-    account = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'UserAccount')))
-    account.send_keys(UserAccount)
-    password = driver.find_element(By.ID, 'Password')
-    password.send_keys(Password)
+    while True:
+        UserAccount = input("Account: ")
+        Password = getpass.getpass()
 
-    login = driver.find_element(By.ID, 'Login')
-    login.click()
-    print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] LogIn Success")
+        account = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'UserAccount')))
+        account.send_keys(UserAccount)
+        password = driver.find_element(By.ID, 'Password')
+        password.send_keys(Password)
+
+        login = driver.find_element(By.ID, 'Login')
+        login.click()
+        try:
+            sleep(0.2)
+            toast = driver.find_element(By.CSS_SELECTOR, 'div#toast-container div.toast div.toast-message')
+            if toast.text == "密碼錯誤，登入失敗！":
+                print("Login Failed!")
+        except NoSuchElementException:
+            print("Login Success!")
+            break
+
+    # 輸入課程代碼
+    Crsno_List = input("Courses: ").split()
 
     # 加退選畫面 Adding Courses
     wait = WebDriverWait(driver, 8)
@@ -103,7 +111,7 @@ def myfunc():
                 toast = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div#toast-container div.toast div.toast-message')))
                 if '加選間隔太短' in toast.text:
                     delay = round(delay * args.enlarge, 3)
-                    print(f'-> too fast, changing delay to {delay}sec...')
+                    print(f'-> too fast, changing delay to {delay:.2f} s')
                 elif '限修人數已額滿!' in toast.text:
                     print("-> Fulled")
                     delay = round(delay * args.deflate, 3)
