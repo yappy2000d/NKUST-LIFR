@@ -10,6 +10,7 @@ from datetime import datetime
 import argparse
 import getpass
 
+
 def myfunc():
     parser = argparse.ArgumentParser()
     parser.add_argument("--delay", type=float, help="基本延遲時間[6.00]", default=6.00)
@@ -21,26 +22,27 @@ def myfunc():
     args = parser.parse_args()
 
     delay = args.delay
+    try:
+        options = webdriver.EdgeOptions()
+        options.add_argument('--disable-web-security --disable-dev-shm-usage')
 
-    options = webdriver.EdgeOptions()
-    options.add_argument('--disable-web-security --disable-dev-shm-usage')
+        if args.headless:
+            options.add_argument('--headless --disable-gpu')
+            options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
-    if args.headless == True:
-        options.add_argument('--headless --disable-gpu')
-        options.add_experimental_option('excludeSwitches', ['enable-logging'])
-
-    driver = webdriver.Edge(options=options)
-    driver.get('https://aais1.nkust.edu.tw/selcrs_dp')
-
+        driver = webdriver.Edge(options=options)
+        driver.get('https://aais1.nkust.edu.tw/selcrs_dp')
+    except WebDriverException:
+        print("WebDriver Error!")
+        return 0
     # 登入頁面
     while True:
         UserAccount = input("Account: ")
         Password = getpass.getpass()
 
-        account = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'UserAccount')))
-        account.send_keys(UserAccount)
-        password = driver.find_element(By.ID, 'Password')
-        password.send_keys(Password)
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.ID, 'UserAccount'))).send_keys(UserAccount)
+
+        driver.find_element(By.ID, 'Password').send_keys(Password)
 
         login = driver.find_element(By.ID, 'Login')
         login.click()
@@ -81,55 +83,63 @@ def myfunc():
                 try:
                     search = driver.find_element(By.ID, "courseSearch")
                 except UnexpectedAlertPresentException:
-                    driver.switch_to().alert().accept()
+                    driver.switch_to.alert.accept()
                 else:
                     search.click()
                     break
                 finally:
                     sleep(0.2)
-            
+
             while True:
-                while True:
-                    try:
-                        add_it = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "td.text-center button.btn_addcrs")))
-                    except UnexpectedAlertPresentException:
-                        driver.switch_to().alert().accept()
-                    else:
-                        sleep(delay)
+                add_it, crs_name = None, None
+                try:
+                    add_it = wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, "td.text-center button.btn_addcrs")))
+                except UnexpectedAlertPresentException:
+                    driver.switch_to.alert.accept()
+                else:
+                    crs_name = add_it.find_element(By.XPATH, '../..//a[@class="myLink"]').text
+                    status = add_it.find_element(By.XPATH, '../..').get_attribute("class")
+                    if "alert-success" in status or "alert-warning" in status:
                         try:
                             print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Adding Crsno:", Crsno)
                             add_it.click()
                             break
                         except (StaleElementReferenceException, TimeoutException):
                             print(f"[ERROR:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Adding Failed! Retrying...")
-                    finally:
-                        sleep(0.2)
-                
-                crs_name = add_it.find_element(By.XPATH, '../..//a[@class="myLink"]').text
+                        sleep(delay)
+                    elif "alert-dark" in status:
+                        print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {Crsno} is fulled. Skipping...")
+                        add_it = None
+                        break
+                finally:
+                    sleep(0.2)
+
+            if add_it:
                 print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Added:", crs_name, end=' ')
-                
-                toast = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div#toast-container div.toast div.toast-message')))
+
+                toast = wait.until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, 'div#toast-container div.toast div.toast-message')))
                 if '加選間隔太短' in toast.text:
                     delay = round(delay * args.enlarge, 3)
                     print(f'-> too fast, changing delay to {delay:.2f} s')
                 elif '限修人數已額滿!' in toast.text:
                     print("-> Fulled")
                     delay = round(delay * args.deflate, 3)
-                    break
                 elif "衝堂，不可選!" in toast.text or "違反重複同課程限修(課號)!" in toast.text:
                     print("-> Failed ", '->', toast.text)
                     Crsno_List.remove(Crsno)
-                    break
                 elif "加入選課完成！" in toast.text:
                     print("-> Success")
                     Crsno_List.remove(Crsno)
-                    break
                 else:
-                    print("-> Unkdatetime.nown action:\n$$$$$\n", toast.text, '\n$$$$$')
+                    print("-> Unknown action:\n$$$$$\n", toast.text, '\n$$$$$')
                     Crsno_List.remove(Crsno)
-                    break
+            else:
+                sleep(1)
 
     print(f"[INFO:{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]Done!")
+    driver.close()
     driver.quit()
 
-    return "Done!"
+    print("Done!")
