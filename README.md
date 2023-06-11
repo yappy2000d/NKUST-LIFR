@@ -23,7 +23,7 @@ NKUST's Lesson Is For Robbers(NKUST-LIFR) is an automatic course-adding program 
 ## Usage/Examples
 
 ```batch
-$ ./NKUST-LIFR.exe.exe --no-headless
+$ ./NKUST-LIFR.exe --no-headless
 >>> NKUST's Courses Auto-Grabbing
 >>> Account: A12345678
 >>> Password: password
